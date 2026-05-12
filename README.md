@@ -6,12 +6,12 @@
 ```bash
 bash <(curl -sL s5n.sh) && . ~/.bashrc
 ```
-- panel
+- nginx
 - rtorrent (REPO)
-- Flood
-- NGINX
-- Let's Encrypt
-- Filebrowser
+- panel
+- flood
+- filebrowser
+- letsencrypt
 
 ### Config NGINX
 - add to /etc/nginx/nginx.conf
