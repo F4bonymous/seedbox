@@ -21,3 +21,6 @@ http {
 # set client body size
 client_max_body_size 5M;
 ```
+```bash
+systemctl reload nginx
+```
