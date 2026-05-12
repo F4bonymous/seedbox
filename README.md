@@ -12,6 +12,7 @@ bash <(curl -sL s5n.sh) && . ~/.bashrc
 - flood
 - filebrowser
 - letsencrypt
+- jellyfin
 
 ### Config NGINX
 - add to /etc/nginx/nginx.conf
