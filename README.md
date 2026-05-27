@@ -9,7 +9,7 @@ bash <(curl -sL s5n.sh) && . ~/.bashrc
 - nginx
 - rtorrent (REPO)
 - panel
-- flood
+- flood (socket : /var/run/{USER}/.rtorrent.sock)
 - filebrowser
 - letsencrypt
 - jellyfin
