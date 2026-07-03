@@ -1,10 +1,10 @@
 // ==UserScript==
 // @name         C411 overlay F1
 // @namespace    http://tampermonkey.net/
-// @version      0.2
+// @version      0.3
 // @description  my overlay
 // @author       Fabonymous
-// @match        https://c411.org/torrents?q=f1&cat=1&subcat=9
+// @match        https://c411.org/torrents?q=f1&cat=1
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=c411.org
 // @grant        GM_xmlhttpRequest
 // @connect      localhost
@@ -14,13 +14,14 @@
     'use strict';
 
     const fabonymous = {
-        version: '0.2',
+        version: '0.3',
         alert: (name) => {GM_xmlhttpRequest({method:"GET",url:`http://localhost:3411/alert?name=${name}`});},
         run: () => {
             console.log('Fabonymous running...');
             document.querySelector("header").style.display = 'none';
             const divs = document.querySelector('main').querySelectorAll('div');
             let pixelToScroll = 0;
+            let firstorrent = true;
             divs.forEach(div => {
                 if(div.classList.contains('dark:divide-emerald-800/30')) {
                     if(!div.classList.contains('relative')) {
@@ -46,7 +47,10 @@
                                     let sinceMin = parseInt(torrentTime.innerText.replace(' min',''));
                                     if(sinceMin <= 3) {
                                         // ALERT
-                                        fabonymous.alert(torrentName.innerHTML);
+                                        if(firstorrent) {
+                                            firstorrent = false;
+                                            fabonymous.alert(torrentName.innerHTML);
+                                        }
                                         torrentName.style.color = 'white';
                                         torrentTime.classList.replace('text-xs', 'text-xl');
                                         torrentTime.classList.remove('text-muted');
@@ -109,8 +113,8 @@
                 // Run
                 fabonymous.run();
                 // Refresh
-                setTimeout( () => { window.location.reload(); }, 30_000);
-                let sec = 29;
+                setTimeout( () => { window.location.reload(); }, 60_000);
+                let sec = 59;
                 setInterval( () => {
                     document.title = `Fabonymous | ${sec--}`;
                     if(sec<0) { window.location.reload(); }
