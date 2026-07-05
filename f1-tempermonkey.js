@@ -16,7 +16,7 @@
     'use strict';
 
     const fabonymous = {
-        version: '0.6',
+        version: '0.4',
         alert: (name) => {GM_xmlhttpRequest({method:"GET",url:`http://localhost:3411/alert?name=${name}`});},
         run: () => {
             console.log('Fabonymous running...');
