@@ -1,12 +1,14 @@
 // ==UserScript==
 // @name         C411 overlay F1
 // @namespace    http://tampermonkey.net/
-// @version      0.3
-// @description  my overlay
+// @version      0.4
+// @description  my overlay with dynamic refresh slider (fixed to bottom-left)
 // @author       Fabonymous
 // @match        https://c411.org/torrents?q=f1&cat=1
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=c411.org
 // @grant        GM_xmlhttpRequest
+// @grant        GM_setValue
+// @grant        GM_getValue
 // @connect      localhost
 // ==/UserScript==
 
@@ -14,7 +16,7 @@
     'use strict';
 
     const fabonymous = {
-        version: '0.3',
+        version: '0.6',
         alert: (name) => {GM_xmlhttpRequest({method:"GET",url:`http://localhost:3411/alert?name=${name}`});},
         run: () => {
             console.log('Fabonymous running...');
@@ -101,24 +103,94 @@
             window.scrollTo(0, pixelToScroll);
             console.log('Fabonymous done.');
         },
-    }
+        
+        initOverlay: (currentDelay, onDelayChange) => {
+            const overlay = document.createElement('div');
+            // Modification du CSS pour positionner en bas à gauche
+            overlay.style = `
+                position: fixed;
+                bottom: 10px; /* Ancrage en bas */
+                left: 10px;
+                z-index: 9999;
+                background: rgba(20, 20, 20, 0.85);
+                border: 1px solid rgba(16, 185, 129, 0.3);
+                padding: 10px;
+                border-radius: 6px;
+                color: #fff;
+                font-family: sans-serif;
+                font-size: 12px;
+                box-shadow: 0 -4px 6px rgba(0,0,0,0.3); /* Ombre portée inversée */
+                backdrop-filter: blur(4px);
+                display: flex;
+                flex-direction: column;
+                gap: 5px;
+            `;
+            
+            overlay.innerHTML = `
+                <div style="font-weight: bold; color: #10b981; display: flex; justify-content: space-between;">
+                    <span>Fabonymous F1</span>
+                    <span id="f1-timer-display">--s</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <input type="range" id="f1-delay-slider" min="15" max="60" value="${currentDelay}" style="cursor: pointer; accent-color: #10b981;">
+                    <span id="f1-delay-value" style="min-width: 25px; text-align: right;">${currentDelay}s</span>
+                </div>
+            `;
+            
+            document.body.appendChild(overlay);
+            
+            const slider = document.getElementById('f1-delay-slider');
+            const valueDisplay = document.getElementById('f1-delay-value');
+            
+            slider.addEventListener('input', (e) => {
+                const val = parseInt(e.target.value);
+                valueDisplay.innerText = `${val}s`;
+                onDelayChange(val);
+            });
+        }
+    };
 
     console.log(`Fabonymous ${fabonymous.version} loaded.`);
 
-    // Wait loading page
-    let w8t = setInterval( () => {
+    let currentDelay = GM_getValue('refreshDelay', 60);
+    let sec = currentDelay;
+    let refreshTimeout = null;
+    let countdownInterval = null;
+
+    function startTimers() {
+        if (refreshTimeout) clearTimeout(refreshTimeout);
+        if (countdownInterval) clearInterval(countdownInterval);
+
+        refreshTimeout = setTimeout(() => { window.location.reload(); }, sec * 1000);
+
+        countdownInterval = setInterval(() => {
+            sec--;
+            document.title = `Fabonymous | ${sec}`;
+            const timerDisplay = document.getElementById('f1-timer-display');
+            if (timerDisplay) timerDisplay.innerText = `${sec}s`;
+
+            if (sec < 0) { window.location.reload(); }
+        }, 1000);
+    }
+
+    let w8t = setInterval(() => {
         if(document.querySelector("header") !== null) {
             clearInterval(w8t);
-            setTimeout( () => {
-                // Run
+            setTimeout(() => {
+                
                 fabonymous.run();
-                // Refresh
-                setTimeout( () => { window.location.reload(); }, 60_000);
-                let sec = 59;
-                setInterval( () => {
-                    document.title = `Fabonymous | ${sec--}`;
-                    if(sec<0) { window.location.reload(); }
-                }, 1_000);
+                
+                fabonymous.initOverlay(currentDelay, (newDelay) => {
+                    GM_setValue('refreshDelay', newDelay);
+                    if (sec > newDelay) {
+                        sec = newDelay;
+                    }
+                    clearTimeout(refreshTimeout);
+                    refreshTimeout = setTimeout(() => { window.location.reload(); }, sec * 1000);
+                });
+
+                startTimers();
+
             }, 100);
         }
     }, 100);
