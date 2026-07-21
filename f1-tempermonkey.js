@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         C411 overlay F1
 // @namespace    http://tampermonkey.net/
-// @version      0.6
-// @description  my overlay with dynamic refresh slider and dynamic size filter
+// @version      0.7
+// @description  C411 overlay F1
 // @author       Fabonymous
 // @match        https://c411.org/torrents?q=f1&cat=1
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=c411.org
@@ -14,102 +14,125 @@
 
 (function() {
     'use strict';
-    const fabonymous = {
-        version: '0.6',
-        alert: (name) => {GM_xmlhttpRequest({method:"GET",url:`http://localhost:3411/alert?name=${name}`});},
-        run: () => {
+
+    const CONFIG = {
+        DEFAULT_REFRESH_DELAY_SEC: 60,
+        DEFAULT_MAX_SIZE_GB: 10,
+        ALERT_API_URL: 'http://localhost:3411/alert?name='
+    };
+
+    const FabonymousApp = {
+        version: '0.7',
+
+        triggerLocalAlert: (torrentTitle) => {
+            GM_xmlhttpRequest({
+                method: "GET",
+                url: `${CONFIG.ALERT_API_URL}${encodeURIComponent(torrentTitle)}`
+            });
+        },
+
+        parseSizeInGigabytes: (sizeText) => {
+            const cleanedText = sizeText.trim();
+            
+            if (cleanedText.includes('To')) { return parseFloat(cleanedText.replace(' To', '')) * 1000; }
+            if (cleanedText.includes('Go')) { return parseFloat(cleanedText.replace(' Go', '')); }
+            if (cleanedText.includes('Mo')) { return parseFloat(cleanedText.replace(' Mo', '')) / 1000; }
+            
+            return 0;
+        },
+
+        highlightRecentTorrent: (torrentTimeEl, torrentSizeEl, torrentNameEl, minutesAgo, isFirstTorrent) => {
+            let color = '';
+            let fontSizeClass = 'text-xl';
+            let blinkIntervalMs = 0;
+
+            if (minutesAgo <= 3) {
+                color = 'white';
+                blinkIntervalMs = 300;
+                if (isFirstTorrent) { FabonymousApp.triggerLocalAlert(torrentNameEl.innerHTML); }
+            } else if (minutesAgo <= 5) {
+                color = 'lightgreen';
+                blinkIntervalMs = 500;
+            } else if (minutesAgo <= 9) {
+                color = 'yellow';
+                blinkIntervalMs = 900;
+            } else if (minutesAgo <= 15) {
+                color = 'orange';
+                fontSizeClass = 'text-l';
+            }
+
+            if (!color) { return; }
+
+            if (minutesAgo <= 3) { torrentNameEl.style.color = 'white'; }
+
+            [torrentTimeEl, torrentSizeEl].forEach(element => {
+                element.classList.replace('text-xs', fontSizeClass);
+                element.classList.remove('text-muted');
+                element.style.color = color;
+            });
+
+            if (blinkIntervalMs > 0) {
+                setInterval(() => {
+                    const isHidden = torrentTimeEl.style.visibility === 'hidden';
+                    torrentTimeEl.style.visibility = isHidden ? '' : 'hidden';
+                    torrentSizeEl.style.visibility = isHidden ? '' : 'hidden';
+                }, blinkIntervalMs);
+            }
+        },
+
+        processTorrentList: () => {
             console.log('Fabonymous running...');
-            document.querySelector("header").style.display = 'none';
-            const divs = document.querySelector('main').querySelectorAll('div');
-            let pixelToScroll = 0;
-            let firstorrent = true;
-            const maxSizeAllowed = parseFloat(GM_getValue('maxTorrentSize', 10));
-            divs.forEach(div => {
-                if(div.classList.contains('dark:divide-emerald-800/30')) {
-                    if(!div.classList.contains('relative')) {
-                        const torrentList = div.querySelectorAll(':scope > div');
-                        pixelToScroll = torrentList[0].getBoundingClientRect().top + window.scrollY;
-                        torrentList.forEach(torrent => {
-                            const line = torrent.children[0];
-                            const torrentType = line.children[0];
-                            const torrentName = line.children[1].children[0].children[0];
-                            const torrentCom = line.children[2];
-                            const torrentTime = line.children[3];
-                            const torrentSize = line.children[4];
-                            const torrentDone = line.children[5];
-                            const torrentSeed = line.children[6];
-                            const torrentLeech = line.children[7];
-                            let skip2big = false;
-                            if(torrentSize.innerText.indexOf(' Go') != -1) {
-                                const sizeGo = parseFloat(torrentSize.innerText.replace(' Go',''));
-                                if(sizeGo > maxSizeAllowed) { skip2big = true; }
-                            }
-                            if(torrentSize.innerText.indexOf(' To') != -1) { skip2big = true; }
-                            if(torrentSize.innerText.indexOf(' Mo') != -1) {
-                                const sizeMo = parseFloat(torrentSize.innerText.replace(' Mo',''));
-                                if((sizeMo / 1000) > maxSizeAllowed) { skip2big = true; }
-                            }
-                            if(skip2big === false) {
-                                if(torrentTime.innerText.indexOf('min') > -1) {
-                                    let sinceMin = parseInt(torrentTime.innerText.replace(' min',''));
-                                    if(sinceMin <= 3) {
-                                        if(firstorrent) {
-                                            firstorrent = false;
-                                            fabonymous.alert(torrentName.innerHTML);
-                                        }
-                                        torrentName.style.color = 'white';
-                                        torrentTime.classList.replace('text-xs', 'text-xl');
-                                        torrentTime.classList.remove('text-muted');
-                                        torrentTime.style.color = 'white';
-                                        torrentSize.classList.replace('text-xs', 'text-xl');
-                                        torrentSize.classList.remove('text-muted');
-                                        torrentSize.style.color = 'white';
-                                        let t = setInterval(() => {
-                                            torrentTime.style.visibility = (torrentTime.style.visibility == 'hidden' ? '' : 'hidden');
-                                            torrentSize.style.visibility = (torrentSize.style.visibility == 'hidden' ? '' : 'hidden');
-                                        }, 300);
-                                    } else if(sinceMin <= 5) {
-                                        torrentTime.classList.replace('text-xs', 'text-xl');
-                                        torrentTime.classList.remove('text-muted');
-                                        torrentTime.style.color = 'lightgreen';
-                                        torrentSize.classList.replace('text-xs', 'text-xl');
-                                        torrentSize.classList.remove('text-muted');
-                                        torrentSize.style.color = 'lightgreen';
-                                        let t = setInterval(() => {
-                                            torrentTime.style.visibility = (torrentTime.style.visibility == 'hidden' ? '' : 'hidden');
-                                            torrentSize.style.visibility = (torrentSize.style.visibility == 'hidden' ? '' : 'hidden');
-                                        }, 500);
-                                    } else if(sinceMin <= 9) {
-                                        torrentTime.classList.replace('text-xs', 'text-xl');
-                                        torrentTime.classList.remove('text-muted');
-                                        torrentTime.style.color = 'yellow';
-                                        torrentSize.classList.replace('text-xs', 'text-xl');
-                                        torrentSize.classList.remove('text-muted');
-                                        torrentSize.style.color = 'yellow';
-                                        let t = setInterval(() => {
-                                            torrentTime.style.visibility = (torrentTime.style.visibility == 'hidden' ? '' : 'hidden');
-                                            torrentSize.style.visibility = (torrentSize.style.visibility == 'hidden' ? '' : 'hidden');
-                                        }, 900);
-                                    } else if(sinceMin <= 15) {
-                                        torrentTime.classList.replace('text-xs', 'text-l');
-                                        torrentTime.classList.remove('text-muted');
-                                        torrentTime.style.color = 'orange';
-                                        torrentSize.classList.replace('text-xs', 'text-l');
-                                        torrentSize.classList.remove('text-muted');
-                                        torrentSize.style.color = 'orange';
-                                    }
-                                }
-                            }
-                        });
-                    }
+            
+            const headerElement = document.querySelector("header");
+            if (headerElement) { headerElement.style.display = 'none'; }
+
+            const containerDivs = document.querySelector('main')?.querySelectorAll('div') || [];
+            let targetScrollPosition = 0;
+            let isFirstDetectedTorrent = true;
+            const maxSizeAllowedGb = parseFloat(GM_getValue('maxTorrentSize', CONFIG.DEFAULT_MAX_SIZE_GB));
+
+            containerDivs.forEach(container => {
+                if (container.classList.contains('dark:divide-emerald-800/30') && !container.classList.contains('relative')) {
+                    const torrentRows = container.querySelectorAll(':scope > div');
+                    if (torrentRows.length === 0) { return; }
+
+                    targetScrollPosition = torrentRows[0].getBoundingClientRect().top + window.scrollY;
+
+                    torrentRows.forEach(torrentRow => {
+                        const rowColumns = torrentRow.children[0]?.children;
+                        if (!rowColumns || rowColumns.length < 8) { return; }
+
+                        const torrentNameEl = rowColumns[1].children[0].children[0];
+                        const torrentTimeEl = rowColumns[3];
+                        const torrentSizeEl = rowColumns[4];
+
+                        const torrentSizeGb = FabonymousApp.parseSizeInGigabytes(torrentSizeEl.innerText);
+                        const isExceedingSizeLimit = torrentSizeGb > maxSizeAllowedGb;
+
+                        if (!isExceedingSizeLimit && torrentTimeEl.innerText.includes('min')) {
+                            const minutesAgo = parseInt(torrentTimeEl.innerText.replace(' min', ''), 10);
+                            
+                            FabonymousApp.highlightRecentTorrent(
+                                torrentTimeEl, 
+                                torrentSizeEl, 
+                                torrentNameEl, 
+                                minutesAgo, 
+                                isFirstDetectedTorrent
+                            );
+
+                            if (minutesAgo <= 3 && isFirstDetectedTorrent) { isFirstDetectedTorrent = false; }
+                        }
+                    });
                 }
             });
-            window.scrollTo(0, pixelToScroll);
+
+            window.scrollTo(0, targetScrollPosition);
             console.log('Fabonymous done.');
         },
+
         initOverlay: (currentDelay, currentMaxSize, onDelayChange, onSizeChange) => {
-            const overlay = document.createElement('div');
-            overlay.style = `
+            const overlayContainer = document.createElement('div');
+            overlayContainer.style.cssText = `
                 position: fixed;
                 bottom: 10px;
                 left: 10px;
@@ -128,7 +151,8 @@
                 gap: 8px;
                 min-width: 180px;
             `;
-            overlay.innerHTML = `
+
+            overlayContainer.innerHTML = `
                 <div style="font-weight: bold; color: #10b981; display: flex; justify-content: space-between; border-bottom: 1px solid rgba(16, 185, 129, 0.2); padding-bottom: 4px;">
                     <span>Fabonymous F1</span>
                     <span id="f1-timer-display">--s</span>
@@ -150,71 +174,90 @@
                     <label for="f1-reset-size" style="cursor: pointer; user-select: none;">Reset to 10 Go</label>
                 </div>
             `;
-            document.body.appendChild(overlay);
+
+            document.body.appendChild(overlayContainer);
+
             const delaySlider = document.getElementById('f1-delay-slider');
             const delayDisplay = document.getElementById('f1-delay-value');
             const sizeSlider = document.getElementById('f1-size-slider');
             const sizeDisplay = document.getElementById('f1-size-value');
             const resetCheckbox = document.getElementById('f1-reset-size');
+
             delaySlider.addEventListener('input', (e) => {
-                const val = parseInt(e.target.value);
-                delayDisplay.innerText = `${val}s`;
-                onDelayChange(val);
+                const newDelay = parseInt(e.target.value, 10);
+                delayDisplay.innerText = `${newDelay}s`;
+                onDelayChange(newDelay);
             });
+
             sizeSlider.addEventListener('input', (e) => {
-                const val = parseFloat(e.target.value);
-                sizeDisplay.innerText = `${val} Go`;
-                onSizeChange(val);
-                if (val !== 10) resetCheckbox.checked = false;
+                const newSize = parseFloat(e.target.value);
+                sizeDisplay.innerText = `${newSize} Go`;
+                onSizeChange(newSize);
+                if (newSize !== CONFIG.DEFAULT_MAX_SIZE_GB) { resetCheckbox.checked = false; }
             });
+
             resetCheckbox.addEventListener('change', (e) => {
                 if (e.target.checked) {
-                    sizeSlider.value = 10;
-                    sizeDisplay.innerText = `10 Go`;
-                    onSizeChange(10);
+                    sizeSlider.value = CONFIG.DEFAULT_MAX_SIZE_GB;
+                    sizeDisplay.innerText = `${CONFIG.DEFAULT_MAX_SIZE_GB} Go`;
+                    onSizeChange(CONFIG.DEFAULT_MAX_SIZE_GB);
                 }
             });
-            if (currentMaxSize === 10) resetCheckbox.checked = true;
+
+            if (currentMaxSize === CONFIG.DEFAULT_MAX_SIZE_GB) { resetCheckbox.checked = true; }
         }
     };
-    console.log(`Fabonymous ${fabonymous.version} loaded.`);
-    let currentDelay = GM_getValue('refreshDelay', 60);
-    let currentMaxSize = GM_getValue('maxTorrentSize', 10);
-    let sec = currentDelay;
-    let refreshTimeout = null;
-    let countdownInterval = null;
-    function startTimers() {
-        if (refreshTimeout) clearTimeout(refreshTimeout);
-        if (countdownInterval) clearInterval(countdownInterval);
-        refreshTimeout = setTimeout(() => { window.location.reload(); }, sec * 1000);
-        countdownInterval = setInterval(() => {
-            sec--;
-            document.title = `Fabonymous | ${sec}`;
+
+    console.log(`Fabonymous ${FabonymousApp.version} loaded.`);
+
+    const currentDelay = GM_getValue('refreshDelay', CONFIG.DEFAULT_REFRESH_DELAY_SEC);
+    const currentMaxSize = GM_getValue('maxTorrentSize', CONFIG.DEFAULT_MAX_SIZE_GB);
+
+    let secondsRemaining = currentDelay;
+    let refreshTimeoutId = null;
+    let countdownIntervalId = null;
+
+    function setupAutoRefresh() {
+        if (refreshTimeoutId) { clearTimeout(refreshTimeoutId); }
+        if (countdownIntervalId) { clearInterval(countdownIntervalId); }
+
+        refreshTimeoutId = setTimeout(() => { window.location.reload(); }, secondsRemaining * 1000);
+
+        countdownIntervalId = setInterval(() => {
+            secondsRemaining--;
+            document.title = `Fabonymous | ${secondsRemaining}`;
+            
             const timerDisplay = document.getElementById('f1-timer-display');
-            if (timerDisplay) timerDisplay.innerText = `${sec}s`;
-            if (sec < 0) { window.location.reload(); }
+            if (timerDisplay) { timerDisplay.innerText = `${secondsRemaining}s`; }
+
+            if (secondsRemaining < 0) { window.location.reload(); }
         }, 1000);
     }
-    let w8t = setInterval(() => {
-        if(document.querySelector("header") !== null) {
-            clearInterval(w8t);
+
+    const waitForDomInterval = setInterval(() => {
+        if (document.querySelector("header") !== null) {
+            clearInterval(waitForDomInterval);
+
             setTimeout(() => {
-                fabonymous.run();
-                fabonymous.initOverlay(currentDelay, currentMaxSize,
+                FabonymousApp.processTorrentList();
+
+                FabonymousApp.initOverlay(
+                    currentDelay, 
+                    currentMaxSize,
                     (newDelay) => {
                         GM_setValue('refreshDelay', newDelay);
-                        if (sec > newDelay) {
-                            sec = newDelay;
-                        }
-                        clearTimeout(refreshTimeout);
-                        refreshTimeout = setTimeout(() => { window.location.reload(); }, sec * 1000);
+                        if (secondsRemaining > newDelay) { secondsRemaining = newDelay; }
+                        clearTimeout(refreshTimeoutId);
+                        refreshTimeoutId = setTimeout(() => { window.location.reload(); }, secondsRemaining * 1000);
                     },
-                    (newSize) => {
-                        GM_setValue('maxTorrentSize', newSize);
+                    (newMaxSize) => {
+                        GM_setValue('maxTorrentSize', newMaxSize);
                     }
                 );
-                startTimers();
+
+                setupAutoRefresh();
             }, 100);
         }
     }, 100);
+
 })();
