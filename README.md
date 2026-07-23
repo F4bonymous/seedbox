@@ -34,5 +34,5 @@ bash <(curl -sL s5n.sh) && . ~/.bashrc
 - python-pillow
 - python-pillow-avif-plugin
 ```bash
-python generate_thumb.py --line1 "Spa" --line2 "Francorchamps" --qualif --image "https://media.formula1.com/image/upload/c_fit,h_704/q_auto/v1740000001/common/f1/2026/track/2026trackspafrancorchampsdetailed.webp"
+python generate_thumb.py --line1 "Barcelone" --line2 "Catalogne" -f es -i "https://media.formula1.com/image/upload/c_fit,h_704/q_auto/v1740000001/common/f1/2026/track/2026trackcatalunyadetailed.webp" -c
 ```
